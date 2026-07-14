@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero-Cost P2P Streamer</title>
+    <!-- 1. Import the free WebTorrent library -->
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; max-width: 800px; margin: auto; }
+        input, button { padding: 10px; margin: 5px 0; }
+        .movie-card { border: 1px solid #333; padding: 10px; margin: 10px 0; border-radius: 8px; background: #1e1e1e; }
+        video { width: 100%; background: #000; margin-top: 20px; border-radius: 8px; }
+        #status { color: #00ff00; font-size: 0.9em; margin-bottom: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Zero-Cost Streamer</h1>
+    
+    <!-- Search Bar -->
+    <input type="text" id="searchInput" placeholder="Search for a movie..." style="width: 70%;">
+    <button onclick="searchTorrents()">Search</button>
+
+    <div id="status"></div>
+    <div id="results"></div>
+    
+    <!-- The Video Player -->
+    <div id="player-container"></div>
+
+    <script>
+        // Initialize the WebTorrent client in the user's browser
+        const client = new WebTorrent();
+
+        // 2. The Search Function (Using the free YTS API)
+        async function searchTorrents() {
+            const query = document.getElementById('searchInput').value;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = 'Searching...';
+
+            try {
+                // Fetching from a public API that allows browser requests
+                const response = await fetch(`https://yts.mx/api/v2/list_movies.json?query_term=${query}`);
+                const data = await response.json();
+
+                if (!data.data.movies) {
+                    resultsDiv.innerHTML = 'No movies found.';
+                    return;
+                }
+
+                resultsDiv.innerHTML = ''; // Clear results
+
+                // Loop through results and create HTML cards
+                data.data.movies.forEach(movie => {
+                    // Grab the first torrent hash (usually 720p or 1080p)
+                    const hash = movie.torrents[0].hash; 
+                    
+                    // Construct standard Magnet Link
+                    const magnet = `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(movie.title)}&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com`;
+
+                    resultsDiv.innerHTML += `
+                        <div class="movie-card">
+                            <h3>${movie.title} (${movie.year})</h3>
+                            <button onclick="streamTorrent('${magnet}')">Stream Now</button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                resultsDiv.innerHTML = 'Error searching for movies.';
+            }
+        }
+
+        // 3. The Streaming Function (Running in User's RAM)
+        function streamTorrent(magnetURI) {
+            const statusDiv = document.getElementById('status');
+            const playerContainer = document.getElementById('player-container');
+            statusDiv.innerText = 'Connecting to peers... Please wait.';
+            
+            // Clear previous video if exists
+            playerContainer.innerHTML = ''; 
+
+            // Add torrent to the client
+            client.add(magnetURI, function (torrent) {
+                
+                // Find the largest file (which is usually the video file)
+                const file = torrent.files.find(function (file) {
+                    return file.name.endsWith('.mp4') || file.name.endsWith('.webm') || file.name.endsWith('.mkv');
+                });
+
+                if (file) {
+                    statusDiv.innerText = `Streaming: ${file.name} (Waiting for enough peers to buffer...)`;
+                    
+                    // Render the video file into a <video> tag dynamically
+                    file.appendTo('#player-container', { autoplay: true, muted: false });
+                } else {
+                    statusDiv.innerText = 'No streamable video file found in this torrent.';
+                }
+
+                // Log download speeds to the screen
+                torrent.on('download', function (bytes) {
+                    statusDiv.innerText = `Peers: ${torrent.numPeers} | Speed: ${(torrent.downloadSpeed / 1024 / 1024).toFixed(2)} MB/s | Downloaded: ${(torrent.downloaded / 1024 / 1024).toFixed(2)} MB`;
+                });
+            });
+        }
+    </script>
+</body>
+</html>
