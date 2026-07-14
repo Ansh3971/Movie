@@ -3,104 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zero-Cost P2P Streamer</title>
-    <!-- 1. Import the free WebTorrent library -->
+    <title>StreamX - WebTorrent Streamer</title>
+    <!-- WebTorrent Library -->
     <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; max-width: 800px; margin: auto; }
-        input, button { padding: 10px; margin: 5px 0; }
-        .movie-card { border: 1px solid #333; padding: 10px; margin: 10px 0; border-radius: 8px; background: #1e1e1e; }
-        video { width: 100%; background: #000; margin-top: 20px; border-radius: 8px; }
-        #status { color: #00ff00; font-size: 0.9em; margin-bottom: 10px;}
+        :root {
+            --bg-color: #0f0f11;
+            --card-bg: #1a1a1f;
+            --accent: #00f2fe;
+            --text: #ffffff;
+            --text-muted: #888890;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text); padding: 20px; }
+        
+        header { text-align: center; margin-bottom: 40px; padding-top: 20px; }
+        header h1 { font-size: 2.5em; margin-bottom: 15px; color: var(--accent); }
+        
+        .search-container { display: flex; max-width: 600px; margin: 0 auto; gap: 10px; }
+        input { flex: 1; padding: 15px 20px; border-radius: 30px; border: none; background: #2a2a30; color: white; font-size: 1.1em; outline: none; transition: 0.3s; }
+        input:focus { box-shadow: 0 0 10px rgba(0, 242, 254, 0.3); }
+        button { padding: 15px 30px; border-radius: 30px; border: none; background: var(--accent); color: #000; font-weight: bold; font-size: 1.1em; cursor: pointer; transition: 0.3s; }
+        button:hover { transform: scale(1.05); }
+
+        /* Loader */
+        .loader { display: none; width: 40px; height: 40px; border: 4px solid #2a2a30; border-top: 4px solid var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 40px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #status-msg { text-align: center; margin-top: 20px; color: var(--text-muted); }
+
+        /* Movie Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 25px; max-width: 1200px; margin: 40px auto; }
+        .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; transition: 0.3s; position: relative; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .card img { width: 100%; height: 300px; object-fit: cover; }
+        .card-info { padding: 15px; }
+        .card-info h3 { font-size: 1.1em; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-info p { color: var(--accent); font-size: 0.9em; margin-bottom: 15px; }
+        .play-btn { width: 100%; background: #2a2a30; color: white; padding: 10px; }
+        .play-btn:hover { background: var(--accent); color: black; }
+
+        /* Player Modal */
+        #player-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .close-btn { position: absolute; top: 20px; right: 30px; font-size: 30px; color: white; cursor: pointer; background: none; padding: 0; }
+        .close-btn:hover { transform: scale(1.2); color: #ff4757; background: none; }
+        
+        #video-container { width: 100%; max-width: 900px; background: #000; border-radius: 8px; overflow: hidden; box-shadow: 0 0 30px rgba(0,242,254,0.1); }
+        video { width: 100%; display: block; }
+        
+        .stats { max-width: 900px; width: 100%; margin-top: 20px; background: var(--card-bg); padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; font-family: monospace; }
+        .progress-bar-container { max-width: 900px; width: 100%; height: 6px; background: #2a2a30; border-radius: 3px; margin-top: 10px; overflow: hidden; }
+        .progress-bar { height: 100%; width: 0%; background: var(--accent); transition: 0.2s; }
     </style>
 </head>
 <body>
 
-    <h1>Zero-Cost Streamer</h1>
-    
-    <!-- Search Bar -->
-    <input type="text" id="searchInput" placeholder="Search for a movie..." style="width: 70%;">
-    <button onclick="searchTorrents()">Search</button>
+    <header>
+        <h1>🎬 StreamX</h1>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search any movie..." onkeypress="if(event.key === 'Enter') searchMovies()">
+            <button onclick="searchMovies()">Search</button>
+        </div>
+    </header>
 
-    <div id="status"></div>
-    <div id="results"></div>
-    
-    <!-- The Video Player -->
-    <div id="player-container"></div>
+    <div class="loader" id="loader"></div>
+    <div id="status-msg"></div>
+    <div class="grid" id="movie-grid"></div>
+
+    <!-- Cinema Player Overlay -->
+    <div id="player-modal">
+        <button class="close-btn" onclick="closePlayer()">×</button>
+        
+        <div id="video-container">
+            <!-- Video gets injected here -->
+        </div>
+        
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        
+        <div class="stats">
+            <span id="stat-status">Finding peers...</span>
+            <span id="stat-speed">0 MB/s</span>
+            <span id="stat-peers">0 Peers</span>
+        </div>
+    </div>
 
     <script>
-        // Initialize the WebTorrent client in the user's browser
+        // 1. Initialize WebTorrent (Only once per page load)
         const client = new WebTorrent();
+        let currentTorrent = null;
 
-        // 2. The Search Function (Using the free YTS API)
-        async function searchTorrents() {
-            const query = document.getElementById('searchInput').value;
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = 'Searching...';
+        // 2. The Robust "Retry" Fetcher for India
+        async function fetchWithFallbacks(query) {
+            const ytsUrl = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`;
+            
+            // We have 3 different proxy routes. If ISP blocks one, we automatically try the next.
+            const proxies = [
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(ytsUrl)}`,
+                `https://corsproxy.io/?${encodeURIComponent(ytsUrl)}`,
+                `https://thingproxy.freeboard.io/fetch/${ytsUrl}`
+            ];
+
+            for (let proxy of proxies) {
+                try {
+                    const response = await fetch(proxy);
+                    if (response.ok) {
+                        return await response.json(); // Success!
+                    }
+                } catch (error) {
+                    console.warn(`Proxy failed: ${proxy}. Trying next...`);
+                }
+            }
+            throw new Error("All proxies blocked by ISP. Try a VPN or custom DNS.");
+        }
+
+        // 3. Search and Render
+        async function searchMovies() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            const grid = document.getElementById('movie-grid');
+            const loader = document.getElementById('loader');
+            const msg = document.getElementById('status-msg');
+
+            grid.innerHTML = '';
+            msg.innerText = '';
+            loader.style.display = 'block';
 
             try {
-                // Fetching from a public API that allows browser requests
-                const response = await fetch(`https://yts.mx/api/v2/list_movies.json?query_term=${query}`);
-                const data = await response.json();
+                const data = await fetchWithFallbacks(query);
+                loader.style.display = 'none';
 
-                if (!data.data.movies) {
-                    resultsDiv.innerHTML = 'No movies found.';
+                if (!data || !data.data || !data.data.movies) {
+                    msg.innerText = 'No movies found for that search.';
                     return;
                 }
 
-                resultsDiv.innerHTML = ''; // Clear results
-
-                // Loop through results and create HTML cards
                 data.data.movies.forEach(movie => {
-                    // Grab the first torrent hash (usually 720p or 1080p)
-                    const hash = movie.torrents[0].hash; 
+                    // Always try to get the 720p or 1080p hash
+                    const torrentData = movie.torrents.find(t => t.quality === '1080p') || movie.torrents[0];
                     
-                    // Construct standard Magnet Link
-                    const magnet = `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(movie.title)}&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com`;
+                    // WebTorrent requires specific WebSocket trackers to work in browsers
+                    const trackers = '&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&tr=wss%3A%2F%2Ftracker.webtorrent.dev';
+                    const magnet = `magnet:?xt=urn:btih:${torrentData.hash}&dn=${encodeURIComponent(movie.title)}${trackers}`;
 
-                    resultsDiv.innerHTML += `
-                        <div class="movie-card">
-                            <h3>${movie.title} (${movie.year})</h3>
-                            <button onclick="streamTorrent('${magnet}')">Stream Now</button>
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <img src="${movie.medium_cover_image}" alt="${movie.title}" onerror="this.src='https://via.placeholder.com/200x300?text=No+Image'">
+                        <div class="card-info">
+                            <h3>${movie.title}</h3>
+                            <p>⭐ ${movie.rating} / 10 | ${movie.year}</p>
+                            <button class="play-btn" onclick="startStream('${magnet}', '${movie.title.replace(/'/g, "\\'")}')">▶ Stream</button>
                         </div>
                     `;
+                    grid.appendChild(card);
                 });
             } catch (error) {
-                resultsDiv.innerHTML = 'Error searching for movies.';
+                loader.style.display = 'none';
+                msg.innerText = error.message;
             }
         }
 
-        // 3. The Streaming Function (Running in User's RAM)
-        function streamTorrent(magnetURI) {
-            const statusDiv = document.getElementById('status');
-            const playerContainer = document.getElementById('player-container');
-            statusDiv.innerText = 'Connecting to peers... Please wait.';
-            
-            // Clear previous video if exists
-            playerContainer.innerHTML = ''; 
+        // 4. Memory-Safe Streaming Engine
+        function startStream(magnet, title) {
+            const modal = document.getElementById('player-modal');
+            const container = document.getElementById('video-container');
+            const statStatus = document.getElementById('stat-status');
+            const statSpeed = document.getElementById('stat-speed');
+            const statPeers = document.getElementById('stat-peers');
+            const progressBar = document.getElementById('progress-bar');
 
-            // Add torrent to the client
-            client.add(magnetURI, function (torrent) {
+            // Open Modal and reset UI
+            modal.style.display = 'flex';
+            container.innerHTML = ''; 
+            statStatus.innerText = `Fetching metadata for: ${title}...`;
+            statSpeed.innerText = '0 MB/s';
+            statPeers.innerText = '0 Peers';
+            progressBar.style.width = '0%';
+
+            // CRITICAL: Destroy old torrent to prevent memory leaks and browser crashes
+            if (currentTorrent) {
+                client.remove(currentTorrent.infoHash);
+            }
+
+            // Start new download
+            client.add(magnet, function (torrent) {
+                currentTorrent = torrent;
                 
-                // Find the largest file (which is usually the video file)
-                const file = torrent.files.find(function (file) {
-                    return file.name.endsWith('.mp4') || file.name.endsWith('.webm') || file.name.endsWith('.mkv');
-                });
+                // Find the MP4 or MKV file
+                const file = torrent.files.find(f => f.name.endsWith('.mp4') || f.name.endsWith('.mkv') || f.name.endsWith('.webm'));
 
-                if (file) {
-                    statusDiv.innerText = `Streaming: ${file.name} (Waiting for enough peers to buffer...)`;
-                    
-                    // Render the video file into a <video> tag dynamically
-                    file.appendTo('#player-container', { autoplay: true, muted: false });
-                } else {
-                    statusDiv.innerText = 'No streamable video file found in this torrent.';
+                if (!file) {
+                    statStatus.innerText = 'Error: No playable video format found in this torrent.';
+                    return;
                 }
 
-                // Log download speeds to the screen
+                statStatus.innerText = `Buffering: ${file.name}`;
+                
+                // Inject the video tag
+                file.appendTo('#video-container', { autoplay: true, muted: false });
+
+                // Update real-time stats
                 torrent.on('download', function (bytes) {
-                    statusDiv.innerText = `Peers: ${torrent.numPeers} | Speed: ${(torrent.downloadSpeed / 1024 / 1024).toFixed(2)} MB/s | Downloaded: ${(torrent.downloaded / 1024 / 1024).toFixed(2)} MB`;
+                    statPeers.innerText = `${torrent.numPeers} Peers`;
+                    statSpeed.innerText = `${(torrent.downloadSpeed / 1048576).toFixed(2)} MB/s`;
+                    progressBar.style.width = `${(torrent.progress * 100).toFixed(1)}%`;
+                    
+                    if (torrent.progress > 0.05) {
+                        statStatus.innerText = `Streaming (${(torrent.downloaded / 1048576).toFixed(1)} MB downloaded)`;
+                    }
+                });
+
+                torrent.on('done', function () {
+                    statStatus.innerText = 'Download Complete! (Playing from cache)';
+                    statSpeed.innerText = '0 MB/s';
                 });
             });
+        }
+
+        // 5. Cleanup when closing player
+        function closePlayer() {
+            document.getElementById('player-modal').style.display = 'none';
+            document.getElementById('video-container').innerHTML = ''; // Kill video tag
+            
+            // Destroy the torrent to stop downloading and free memory
+            if (currentTorrent) {
+                client.remove(currentTorrent.infoHash);
+                currentTorrent = null;
+            }
         }
     </script>
 </body>
