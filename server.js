@@ -5,51 +5,54 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve the index.html file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// The 100% Free Search API Endpoint
 app.get('/api/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: "No search term provided" });
 
     const baseTarget = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`;
 
-    // The Free Routing Engine: Direct Mirrors + Public API Proxies
     const freeRoutes = [
-        baseTarget, // 1. Try direct connection first
-        `https://yts.rs/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`, // 2. Official Mirror
-        `https://yts.do/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`, // 3. Official Mirror
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(baseTarget)}`,           // 4. Free Public Proxy 1
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseTarget)}`       // 5. Free Public Proxy 2
+        baseTarget, 
+        `https://yts.rs/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`,
+        `https://yts.do/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(baseTarget)}`,           
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseTarget)}`       
     ];
 
-    // Loop through the free routes until one successfully bypasses Cloudflare
+    // THE FIX: We disguise the Node.js server to look exactly like Google Chrome
+    const browserHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://google.com/'
+    };
+
     for (let route of freeRoutes) {
         try {
-            console.log(`Trying route: ${route.substring(0, 40)}...`);
+            console.log(`Trying route: ${route.substring(0, 50)}...`);
             
             const response = await axios.get(route, { 
-                timeout: 8000 // Max 8 seconds per attempt
+                headers: browserHeaders, // Inject the fake browser headers here
+                timeout: 8000 
             });
             
-            // Verify we actually got the JSON movie data back (not a Cloudflare block page)
             if (response.data && response.data.data) {
-                console.log("Success! Data fetched.");
+                console.log("Success! Cloudflare bypassed.");
                 return res.status(200).json(response.data);
             }
         } catch (error) {
-            console.log("Route blocked or failed. Switching to next...");
+            // Log the actual error code (e.g., 403 Forbidden) so we know exactly why it failed
+            console.log(`Route failed: HTTP ${error.response ? error.response.status : error.message}`);
         }
     }
 
-    // If everything fails
-    return res.status(500).json({ error: "All free servers and public proxies are currently blocked." });
+    return res.status(500).json({ error: "All servers blocked. Cloudflare WAF is actively blocking Render IPs." });
 });
 
-// Start the server
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
