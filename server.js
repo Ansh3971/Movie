@@ -1,5 +1,4 @@
 const express = require('express');
-const axios = require('axios');
 const path = require('path');
 
 const app = express();
@@ -9,48 +8,81 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Helper function: Strictly limits how long a request can take to prevent hanging
+async function fetchWithTimeout(url, options = {}, timeout = 6000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+}
+
 app.get('/api/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: "No search term provided" });
 
-    const baseTarget = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`;
-
-    const freeRoutes = [
-        baseTarget, 
-        `https://yts.rs/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`,
-        `https://yts.do/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(baseTarget)}`,           
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(baseTarget)}`       
-    ];
-
-    // THE FIX: We disguise the Node.js server to look exactly like Google Chrome
-    const browserHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://google.com/'
+    const target = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`;
+    
+    // Disguise our server as a standard Windows PC running Chrome
+    const options = {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+        }
     };
 
-    for (let route of freeRoutes) {
-        try {
-            console.log(`Trying route: ${route.substring(0, 50)}...`);
-            
-            const response = await axios.get(route, { 
-                headers: browserHeaders, // Inject the fake browser headers here
-                timeout: 8000 
-            });
-            
-            if (response.data && response.data.data) {
-                console.log("Success! Cloudflare bypassed.");
-                return res.status(200).json(response.data);
+    // Attempt 1: AllOrigins JSON Wrapper (Highly effective against DNS blocks)
+    try {
+        console.log("Attempt 1: AllOrigins...");
+        const response = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(target)}`, options, 8000);
+        const json = await response.json();
+        
+        if (json.contents) {
+            try {
+                // If Cloudflare returns an HTML block page, JSON.parse will fail gracefully and jump to Attempt 2
+                const ytsData = JSON.parse(json.contents);
+                if (ytsData.data && ytsData.data.movies) {
+                    console.log("✅ Success via AllOrigins!");
+                    return res.status(200).json(ytsData);
+                }
+            } catch (e) {
+                console.log("❌ AllOrigins returned HTML (Cloudflare block).");
             }
-        } catch (error) {
-            // Log the actual error code (e.g., 403 Forbidden) so we know exactly why it failed
-            console.log(`Route failed: HTTP ${error.response ? error.response.status : error.message}`);
+        }
+    } catch (e) { console.log("❌ AllOrigins failed:", e.message); }
+
+    // Attempt 2: CorsProxy
+    try {
+        console.log("Attempt 2: CorsProxy...");
+        const response = await fetchWithTimeout(`https://corsproxy.io/?url=${encodeURIComponent(target)}`, options, 8000);
+        const ytsData = await response.json();
+        if (ytsData.data && ytsData.data.movies) {
+            console.log("✅ Success via CorsProxy!");
+            return res.status(200).json(ytsData);
+        }
+    } catch (e) { console.log("❌ CorsProxy failed."); }
+
+    // Attempt 3: Direct Backup Mirrors (Bypasses Render's ENOTFOUND block on the main domain)
+    // We iterate through 5 different YTS extensions in case one is seized or down.
+    const mirrors = ['yts.lt', 'yts.ag', 'yts.am', 'yts.rs', 'yts.vc'];
+    for (let domain of mirrors) {
+        try {
+            console.log(`Attempt 3: Mirror ${domain}...`);
+            const mirrorUrl = `https://${domain}/api/v2/list_movies.json?query_term=${encodeURIComponent(query)}`;
+            const response = await fetchWithTimeout(mirrorUrl, options, 6000);
+            const ytsData = await response.json();
+            
+            if (ytsData.data && ytsData.data.movies) {
+                console.log(`✅ Success via ${domain}!`);
+                return res.status(200).json(ytsData);
+            }
+        } catch (e) {
+            console.log(`❌ ${domain} failed.`);
         }
     }
 
-    return res.status(500).json({ error: "All servers blocked. Cloudflare WAF is actively blocking Render IPs." });
+    console.log("🛑 All routes exhausted.");
+    return res.status(500).json({ error: "All backend routing attempts were blocked. Please try searching again in a few minutes." });
 });
 
 app.listen(PORT, () => {
