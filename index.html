@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamX - 100% Serverless P2P Streamer</title>
+    <title>StreamX - Ultimate P2P</title>
     <!-- WebTorrent Engine -->
     <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
     <style>
@@ -11,7 +11,6 @@
             --bg: #0a0a0c;
             --panel: #141419;
             --accent: #00f2fe;
-            --accent-gradient: linear-gradient(45deg, #00f2fe, #4facfe);
             --text: #ffffff;
             --text-dim: #7e7e8c;
         }
@@ -19,45 +18,42 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
 
-        header { text-align: center; max-width: 600px; margin: 40px auto; }
-        header h1 { font-size: 2.8em; font-weight: 800; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px; }
+        header { text-align: center; max-width: 600px; margin: 20px auto; }
+        header h1 { font-size: 2.8em; font-weight: 800; color: var(--accent); margin-bottom: 20px; }
         
-        .search-box { display: flex; background: var(--panel); border: 1px solid #22222a; border-radius: 30px; padding: 6px 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .search-box { display: flex; background: var(--panel); border: 1px solid #22222a; border-radius: 30px; padding: 6px 10px; }
         .search-box input { flex: 1; background: transparent; border: none; padding: 10px 15px; color: white; font-size: 1.1em; outline: none; }
-        .search-box button { background: var(--accent-gradient); color: #000; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; font-size: 1em; cursor: pointer; transition: 0.2s; }
-        .search-box button:hover { opacity: 0.9; transform: scale(1.02); }
+        .search-box button { background: var(--accent); color: #000; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .search-box button:hover { opacity: 0.9; transform: scale(1.05); }
 
-        /* Loader Animation */
-        .spinner { display: none; width: 45px; height: 45px; border: 4px solid #1f1f26; border-top: 4px solid var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 40px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        #status-msg { text-align: center; color: var(--text-dim); font-size: 1em; max-width: 500px; margin: 20px auto; line-height: 1.5; }
+        /* Real-Time Terminal Log */
+        #terminal-log { background: #000; border: 1px solid #333; border-radius: 8px; max-width: 600px; margin: 20px auto; padding: 15px; font-family: 'Courier New', Courier, monospace; font-size: 0.85em; color: #0f0; display: none; max-height: 200px; overflow-y: auto; text-align: left; line-height: 1.4;}
+        .log-success { color: #00f2fe; font-weight: bold; }
+        .log-error { color: #ff4757; }
+        .log-warn { color: #ffa502; }
 
         /* Results Grid */
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 30px; max-width: 1200px; margin: 40px auto; }
-        .card { background: var(--panel); border-radius: 16px; overflow: hidden; border: 1px solid #1f1f26; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); display: flex; flex-direction: column; }
-        .card:hover { transform: translateY(-8px); border-color: var(--accent); box-shadow: 0 12px 24px rgba(0, 242, 254, 0.15); }
-        .card img { width: 100%; height: 260px; object-fit: cover; background: #1f1f26; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; max-width: 1200px; margin: 40px auto; }
+        .card { background: var(--panel); border-radius: 12px; overflow: hidden; border: 1px solid #1f1f26; transition: 0.3s; display: flex; flex-direction: column; }
+        .card:hover { transform: translateY(-5px); border-color: var(--accent); }
+        .card img { width: 100%; height: 260px; object-fit: cover; }
         .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
         .card-title { font-size: 1em; font-weight: 600; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .card-meta { color: var(--text-dim); font-size: 0.85em; margin-bottom: 15px; display: flex; justify-content: space-between; }
-        .card-meta span { color: var(--accent); font-weight: bold; }
         
         .stream-btn { background: #1f1f26; color: #fff; border: 1px solid #2d2d3a; padding: 10px; border-radius: 8px; width: 100%; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .stream-btn:hover { background: var(--text); color: #000; border-color: var(--text); }
+        .stream-btn:hover { background: var(--accent); color: #000; }
 
         /* Cinema Overlay Player */
         #cinema-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 7, 0.98); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .close-cinema { position: absolute; top: 25px; right: 35px; font-size: 45px; color: var(--text-dim); background: none; border: none; cursor: pointer; transition: 0.2s; }
-        .close-cinema:hover { color: #ff4757; transform: scale(1.1); }
-        
-        #video-wrapper { width: 100%; max-width: 960px; background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid #222; }
+        .close-cinema { position: absolute; top: 25px; right: 35px; font-size: 45px; color: var(--text-dim); background: none; border: none; cursor: pointer; }
+        .close-cinema:hover { color: #ff4757; }
+        #video-wrapper { width: 100%; max-width: 900px; background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         video { width: 100%; display: block; }
         
-        .player-dashboard { max-width: 960px; width: 100%; margin-top: 25px; background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid #1f1f26; }
-        .progress-track { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-bottom: 15px; }
-        .progress-fill { height: 100%; width: 0%; background: var(--accent-gradient); transition: 0.3s linear; }
-        .live-stats { display: flex; justify-content: space-between; font-family: 'Courier New', monospace; font-size: 0.9em; color: var(--text-dim); }
+        .player-dashboard { max-width: 900px; width: 100%; margin-top: 15px; background: var(--panel); padding: 15px; border-radius: 12px; }
+        .progress-track { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+        .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: 0.3s; }
+        .live-stats { display: flex; justify-content: space-between; font-family: monospace; font-size: 0.9em; color: var(--text-dim); }
         .live-stats strong { color: var(--text); }
     </style>
 </head>
@@ -66,13 +62,14 @@
     <header>
         <h1>StreamX</h1>
         <div class="search-box">
-            <input type="text" id="queryInput" placeholder="Enter movie title..." onkeypress="if(event.key === 'Enter') executeSearch()">
+            <input type="text" id="queryInput" placeholder="Enter movie title (e.g. Baahubali)..." onkeypress="if(event.key === 'Enter') executeSearch()">
             <button onclick="executeSearch()">Search</button>
         </div>
     </header>
 
-    <div class="spinner" id="loadingSpinner"></div>
-    <div id="status-msg"></div>
+    <!-- The Real-Time Diagnostic Terminal -->
+    <div id="terminal-log"></div>
+    
     <div class="grid" id="outputGrid"></div>
 
     <!-- Fullscreen Cinema Modal -->
@@ -93,27 +90,54 @@
         const p2pClient = new WebTorrent();
         let activeTorrent = null;
 
-        // Multi-mirror query handler designed to bypass Indian ISP blocks smoothly
-        async function fetchMovieData(searchQuery) {
-            const endpoint = `/api/v2/list_movies.json?query_term=${encodeURIComponent(searchQuery)}`;
+        const terminal = document.getElementById('terminal-log');
+        const log = (msg, type = '') => {
+            const time = new Date().toLocaleTimeString();
+            terminal.innerHTML += `<div class="${type}">[${time}] ${msg}</div>`;
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+
+        // Advanced Multi-Route Fetch Engine with Timeout Control
+        async function fetchMovieDataWithRouter(searchQuery) {
+            const targetApi = `https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(searchQuery)}`;
             
-            // Current working top-tier direct mirrors for YTS
-            const targets = [
-                `https://yts.mx${endpoint}`,
-                `https://yts.rs${endpoint}`,
-                `https://yts.do${endpoint}`,
-                `https://yts.lt${endpoint}`
+            const routes = [
+                { name: "Direct Connection", url: targetApi },
+                { name: "CodeTabs Public Proxy", url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetApi)}` },
+                { name: "CORSProxy Edge", url: `https://corsproxy.io/?url=${encodeURIComponent(targetApi)}` },
+                { name: "AllOrigins Network", url: `https://api.allorigins.win/raw?url=${encodeURIComponent(targetApi)}` }
             ];
 
-            for (let targetUrl of targets) {
+            for (let route of routes) {
+                log(`Attempting route: ${route.name}...`, 'log-warn');
+                
+                // Set a strict 6-second timeout so a dead proxy doesn't freeze the app
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+
                 try {
-                    const res = await fetch(targetUrl);
-                    if (res.ok) return await res.json();
-                } catch (e) {
-                    console.warn(`Failed connection to: ${targetUrl}. Trying backup mirror...`);
+                    const response = await fetch(route.url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.status === "ok") {
+                            log(`Bypassed security via ${route.name}! Data secured.`, 'log-success');
+                            return data;
+                        }
+                    } else {
+                        log(`Route Failed: HTTP ${response.status} (Cloudflare block suspected).`, 'log-error');
+                    }
+                } catch (error) {
+                    clearTimeout(timeoutId);
+                    if (error.name === 'AbortError') {
+                        log(`Route Failed: Connection Timed Out.`, 'log-error');
+                    } else {
+                        log(`Route Failed: CORS or Network Drop.`, 'log-error');
+                    }
                 }
             }
-            throw new Error("Unable to reach movie servers. If you are using Jio or Airtel, please enable a VPN or switch your device DNS settings to Cloudflare (1.1.1.1).");
+            throw new Error("All routes failed. Disconnect your VPN (it triggers Cloudflare bot-protection) and try again.");
         }
 
         async function executeSearch() {
@@ -121,27 +145,29 @@
             if (!searchVal) return;
 
             const grid = document.getElementById('outputGrid');
-            const spinner = document.getElementById('loadingSpinner');
-            const status = document.getElementById('status-msg');
-
+            
             grid.innerHTML = '';
-            status.innerText = '';
-            spinner.style.display = 'block';
+            terminal.innerHTML = '';
+            terminal.style.display = 'block';
+            log(`Initializing global search protocol for: "${searchVal}"...`);
 
             try {
-                const payload = await fetchMovieData(searchVal);
-                spinner.style.display = 'none';
+                const payload = await fetchMovieDataWithRouter(searchVal);
+                
+                // Hide terminal on success to show movies
+                setTimeout(() => { terminal.style.display = 'none'; }, 2000);
 
-                if (!payload || !payload.data || !payload.data.movies) {
-                    status.innerText = "No results found. Double-check your spelling or try another title.";
+                if (!payload.data || !payload.data.movies) {
+                    terminal.style.display = 'block';
+                    log(`Search completed, but 0 results found for "${searchVal}". Check spelling.`, 'log-warn');
                     return;
                 }
 
                 payload.data.movies.forEach(item => {
-                    const preferredTorrent = item.torrents.find(t => t.quality === '700p' || t.quality === '1080p') || item.torrents[0];
+                    // Try to grab 720p or fallback to first available
+                    const preferredTorrent = item.torrents.find(t => t.quality === '720p' || t.quality === '1080p') || item.torrents[0];
                     
-                    // Public WebRTC WebSocket hubs to announce client streaming state
-                    const trackingHubs = '&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&tr=wss%3A%2F%2Ftracker.webtorrent.dev&tr=wss%3A%2F%2Ftracker.files.fm%3A7073%2Fannounce';
+                    const trackingHubs = '&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&tr=wss%3A%2F%2Ftracker.webtorrent.dev';
                     const magnetURI = `magnet:?xt=urn:btih:${preferredTorrent.hash}&dn=${encodeURIComponent(item.title)}${trackingHubs}`;
 
                     const element = document.createElement('div');
@@ -150,17 +176,15 @@
                         <img src="${item.medium_cover_image}" alt="Poster" onerror="this.src='https://via.placeholder.com/200x260?text=No+Cover'">
                         <div class="card-body">
                             <div>
-                                <div class="card-title" title="${item.title}">${item.title}</div>
-                                <div class="card-meta">${item.year} <span>⭐ ${item.rating}</span></div>
+                                <div class="card-title" title="${item.title}">${item.title} (${item.year})</div>
                             </div>
-                            <button class="stream-btn" onclick="initializeStream('${magnetURI}', '${item.title.replace(/'/g, "\\'")}')">Watch Now</button>
+                            <button class="stream-btn" onclick="initializeStream('${magnetURI}', '${item.title.replace(/'/g, "\\'")}')">▶ Stream in Browser</button>
                         </div>
                     `;
                     grid.appendChild(element);
                 });
             } catch (err) {
-                spinner.style.display = 'none';
-                status.innerText = err.message;
+                log(err.message, 'log-error');
             }
         }
 
@@ -174,28 +198,24 @@
 
             overlay.style.display = 'flex';
             container.innerHTML = ''; 
-            txtStatus.innerText = `Resolving metadata for ${movieTitle}...`;
+            txtStatus.innerText = `Connecting WebRTC swarm for ${movieTitle}...`;
             txtSpeed.innerText = '0.00 MB/s';
             txtPeers.innerText = '0 Peers';
             progress.style.width = '0%';
 
-            // Evict previous torrent instances from page memory to avoid crashing the browser tab
             if (activeTorrent) p2pClient.remove(activeTorrent.infoHash);
 
             p2pClient.add(magnet, function (torrent) {
                 activeTorrent = torrent;
                 
-                // Track standard web-compatible layouts inside the active swarm Chunks
                 const mediaFile = torrent.files.find(f => f.name.endsWith('.mp4') || f.name.endsWith('.webm') || f.name.endsWith('.mkv'));
 
                 if (!mediaFile) {
-                    txtStatus.innerText = 'Error: The metadata resolved, but no web-supported video file format (.mp4/.webm) is present.';
+                    txtStatus.innerText = 'Error: No web-supported video format found inside torrent.';
                     return;
                 }
 
-                txtStatus.innerText = 'Gathering web peers & buffering...';
-                
-                // Directly streams chunk frames sequentially into dynamically bound HTML5 structures
+                txtStatus.innerText = 'Web peers found. Buffering video to RAM...';
                 mediaFile.appendTo('#video-wrapper', { autoplay: true, muted: false });
 
                 torrent.on('download', function () {
@@ -204,13 +224,8 @@
                     progress.style.width = `${(torrent.progress * 100).toFixed(1)}%`;
                     
                     if (torrent.progress > 0.02) {
-                        txtStatus.innerText = `Streaming: Active P2P Session (${(torrent.downloaded / 1048576).toFixed(1)} MB cached)`;
+                        txtStatus.innerText = `Streaming (${(torrent.downloaded / 1048576).toFixed(1)} MB cached)`;
                     }
-                });
-
-                torrent.on('done', function () {
-                    txtStatus.innerText = 'Buffering complete. Entire track now stored in local memory cache.';
-                    txtSpeed.innerText = '0.00 MB/s';
                 });
             });
         }
@@ -218,7 +233,6 @@
         function terminateStream() {
             document.getElementById('cinema-overlay').style.display = 'none';
             document.getElementById('video-wrapper').innerHTML = ''; 
-            
             if (activeTorrent) {
                 p2pClient.remove(activeTorrent.infoHash);
                 activeTorrent = null;
