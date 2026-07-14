@@ -26,8 +26,10 @@ const proxies = rawProxies.map(p => {
     return `http://${user}:${pass}@${ip}:${port}`;
 });
 
-// Serve the frontend files from the "public" folder
-app.use(express.static('public'));
+// THE FIX: Explicitly send the index.html file from the main root folder
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // The Search API Endpoint
 app.get('/api/search', async (req, res) => {
@@ -58,4 +60,3 @@ app.get('/api/search', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
-
